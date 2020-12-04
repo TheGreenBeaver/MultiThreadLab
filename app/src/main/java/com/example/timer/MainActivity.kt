@@ -1,39 +1,41 @@
 package com.example.timer
 
+
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import kotlinx.android.synthetic.main.activity_main.*
-import kotlinx.coroutines.*
 
 class MainActivity : AppCompatActivity() {
-    private var secondsElapsed: Int = 0
+    var secondsElapsed: Int = 0
+    var appIsOnScreen: Boolean = false
 
-    private lateinit var counterCoroutine: Job
-
-    private suspend fun countSeconds() {
-        while (true) {
-            delay(1000)
-            textSecondsElapsed.text = "Seconds elapsed: " + secondsElapsed++
+    private var backgroundThread = Thread {
+        while (!Thread.interrupted()) try {
+            if (appIsOnScreen) {
+                Thread.sleep(1000)
+                textSecondsElapsed.post {
+                    textSecondsElapsed.text = "Seconds elapsed: ${secondsElapsed++}"
+                }
+            }
+        } catch (e: InterruptedException) {
+            return@Thread
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        backgroundThread.start()
     }
 
     override fun onPause() {
         super.onPause()
-        counterCoroutine.cancel()
+        appIsOnScreen = false
     }
 
     override fun onResume() {
         super.onResume()
-
-        counterCoroutine = GlobalScope.launch(Dispatchers.Main) {
-            countSeconds()
-        }
+        appIsOnScreen = true
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -50,6 +52,11 @@ class MainActivity : AppCompatActivity() {
         savedInstanceState.run {
             secondsElapsed = getInt(STATE_SECONDS)
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        backgroundThread.interrupt()
     }
 
     companion object {
